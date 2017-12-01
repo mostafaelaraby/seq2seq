@@ -146,7 +146,9 @@ class DecodeText(InferenceTask):
 
     if "attention_scores" in self._predictions:
       fetches["attention_scores"] = self._predictions["attention_scores"]
-
+    elif "beam_search_output.scores" in self._predictions:
+      fetches["attention_scores"] = self._predictions["beam_search_output.scores"]
+        
     return tf.train.SessionRunArgs(fetches)
 
   def after_run(self, _run_context, run_values):
