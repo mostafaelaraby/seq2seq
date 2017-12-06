@@ -200,3 +200,56 @@ class StackBidirectionalRNNEncoder(Encoder):
         final_state=final_state,
         attention_values=outputs_concat,
         attention_values_length=sequence_length)
+class GNMTRNNEncoder(Encoder):
+  """
+  A GNMT RNN encoder. Uses the same cell for both the
+  forward and backward RNN. Stacking should be performed as part of
+  the cell.
+
+  Args:
+    cell: An instance of tf.contrib.rnn.RNNCell
+    name: A name for the encoder
+  """
+
+  def __init__(self, params, mode, name="gnmt_rnn_encoder"):
+    super(GNMTRNNEncoder, self).__init__(params, mode, name)
+    bi_params = {'rnn_cell':self.params['rnn_cell_bi']}
+    self.bi_encoder = BidirectionalRNNEncoder(bi_params,mode)
+    self.params["rnn_cell_bi"] = _toggle_dropout(self.params["rnn_cell_bi"], mode)
+    self.params["rnn_cell_uni"] = _toggle_dropout(self.params["rnn_cell_uni"], mode)
+    if self.params["rnn_cell_uni"].contains('num_residual_layers'):
+        self.params["rnn_cell_uni"]["add_residual"] = True
+
+  @staticmethod
+  def default_params():
+    return {
+        "rnn_cell_bi": _default_rnn_cell_params(),
+        "rnn_cell_uni": _default_rnn_cell_params(),
+        "init_scale": 0.04,
+        "num_layers":2
+    }
+
+  def encode(self, inputs, sequence_length, **kwargs):
+    num_layers_2 = self.params['rnn_cell_uni']['num_layers']
+    scope = tf.get_variable_scope()
+    scope.set_initializer(tf.random_uniform_initializer(
+        -self.params["init_scale"],
+        self.params["init_scale"]))
+
+    bi_encoder_output = self.bi_encoder.encode(inputs,sequence_length,**kwargs)
+    uni_cell =   training_utils.get_rnn_cell(**self.params["rnn_cell_uni"])
+
+    encoder_outputs, encoder_state = tf.nn.dynamic_rnn(
+        uni_cell,
+        bi_encoder_output.outputs,
+        dtype=tf.float32,
+        sequence_length=sequence_length)
+        #time_major=self.time_major TODO needs to be checked
+    encoder_state = (bi_encoder_output.final_state[1],) + (
+        (encoder_state,) if num_layers_2 == 1 else encoder_state)
+
+    return EncoderOutput(
+        outputs=encoder_outputs,
+        final_state=encoder_state,
+        attention_values=encoder_outputs,
+        attention_values_length=sequence_length)

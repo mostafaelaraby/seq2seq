@@ -154,6 +154,9 @@ def get_rnn_cell(cell_class,
 
   cells = []
   for _ in range(num_layers):
+    if "add_residual" in cell_params and cell_params["add_residual"]:
+      cell_params['residual_connections'] = (i >= cell_params['num_layers']-cell_params['num_residual_layers'])
+  
     cell = cell_from_spec(cell_class, cell_params)
     if dropout_input_keep_prob < 1.0 or dropout_output_keep_prob < 1.0:
       cell = tf.contrib.rnn.DropoutWrapper(
