@@ -132,7 +132,13 @@ class BidirectionalRNNEncoder(Encoder):
         -self.params["init_scale"],
         self.params["init_scale"]))
 
+    self.params["rnn_cell"]["distributed"] = False
+    self.params["rnn_cell"]["device_name"] = training_utils.getDeviceName(0)
     cell_fw = training_utils.get_rnn_cell(**self.params["rnn_cell"])
+
+    self.params["rnn_cell"]["device_name"] = training_utils.getDeviceName(self.params["rnn_cell"]["num_layers"])
+    if self.params["rnn_cell"]["device_name"] == training_utils.getDeviceName(0):
+        self.params["rnn_cell"]["device_name"] = training_utils.getDeviceName(1) # to ensure the backward cell is working on aniother GPU
     cell_bw = training_utils.get_rnn_cell(**self.params["rnn_cell"])
     outputs, states = tf.nn.bidirectional_dynamic_rnn(
         cell_fw=cell_fw,
@@ -180,7 +186,13 @@ class StackBidirectionalRNNEncoder(Encoder):
         -self.params["init_scale"],
         self.params["init_scale"]))
 
+    self.params["rnn_cell"]["distributed"] = False
+    self.params["rnn_cell"]["device_name"] = training_utils.getDeviceName(0)
     cell_fw = training_utils.get_rnn_cell(**self.params["rnn_cell"])
+
+    self.params["rnn_cell"]["device_name"] = training_utils.getDeviceName(self.params["rnn_cell"]["num_layers"])
+    if self.params["rnn_cell"]["device_name"] == training_utils.getDeviceName(0):
+        self.params["rnn_cell"]["device_name"] = training_utils.getDeviceName(1) # to ensure the backward cell is working on aniother GPU
     cell_bw = training_utils.get_rnn_cell(**self.params["rnn_cell"])
 
     cells_fw = _unpack_cell(cell_fw)

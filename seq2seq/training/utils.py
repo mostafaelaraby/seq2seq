@@ -30,8 +30,29 @@ import json
 
 import tensorflow as tf
 from tensorflow import gfile
+from tensorflow.python.client import device_lib
 
 from seq2seq.contrib import rnn_cell
+
+
+
+
+def memoize(f):
+    """ Memoization decorator for a function taking one or more arguments. """
+    class memodict(dict):
+        def __getitem__(self, *key):
+            return dict.__getitem__(self, key)
+
+        def __missing__(self, key):
+            ret = self[key] = f(*key)
+            return ret
+
+    return memodict().__getitem__
+
+@memoize
+def get_available_devices(device_type='GPU'):
+    local_device_protos = device_lib.list_local_devices()
+    return [x.name for x in local_device_protos if x.device_type.lower() == device_type.lower()]
 
 
 class TrainOptions(object):
@@ -98,7 +119,7 @@ class TrainOptions(object):
         model_params=options_dict["model_params"])
 
 
-def cell_from_spec(cell_classname, cell_params):
+def cell_from_spec(cell_classname, cell_params,device_name=''):
   """Create a RNN Cell instance from a JSON string.
 
   Args:
@@ -123,8 +144,15 @@ def cell_from_spec(cell_classname, cell_params):
           are: {}""".format(key, cell_class.__name__, cell_args))
 
   # Create cell
-  return cell_class(**cell_params)
+  current_cell = cell_class(**cell_params)
+  if not(device_name == ''):
+    current_cell =tf.contrib.rnn.DeviceWrapper(current_cell,  device_name)
+  return current_cell
 
+def getDeviceName(offset):
+    available_gpus = get_available_devices()
+    n_gpus = len(available_gpus)
+    return available_gpus[offset%n_gpus]
 
 def get_rnn_cell(cell_class,
                  cell_params,
@@ -133,7 +161,7 @@ def get_rnn_cell(cell_class,
                  dropout_output_keep_prob=1.0,
                  residual_connections=False,
                  residual_combiner="add",
-                 residual_dense=False):
+                 residual_dense=False,distributed=True,device_name=''):#TODO update it to get gpu number for bidirectional encoder for faster training :LD
   """Creates a new RNN Cell
 
   Args:
@@ -153,11 +181,13 @@ def get_rnn_cell(cell_class,
   """
 
   cells = []
-  for _ in range(num_layers):
+  for i in range(num_layers):
     if "add_residual" in cell_params and cell_params["add_residual"]:
-      cell_params['residual_connections'] = (i >= cell_params['num_layers']-cell_params['num_residual_layers'])
-  
-    cell = cell_from_spec(cell_class, cell_params)
+        cell_params['residual_connections'] = (i >= cell_params['num_layers']-cell_params['num_residual_layers'])
+    if distributed:
+        cell = cell_from_spec(cell_class, cell_params,device_name=getDeviceName(i))
+    else:
+        cell = cell_from_spec(cell_class, cell_params,device_name=device_name)
     if dropout_input_keep_prob < 1.0 or dropout_output_keep_prob < 1.0:
       cell = tf.contrib.rnn.DropoutWrapper(
           cell=cell,

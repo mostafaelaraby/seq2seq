@@ -115,7 +115,8 @@ def main(_argv):
     tf.logging.info("Restored model from %s", checkpoint_path)
 
   scaffold = tf.train.Scaffold(init_fn=session_init_op)
-  session_creator = tf.train.ChiefSessionCreator(scaffold=scaffold)
+  config = tf.ConfigProto(allow_soft_placement=True)
+  session_creator = tf.train.ChiefSessionCreator(scaffold=scaffold,config=config)
   with tf.train.MonitoredSession(
       session_creator=session_creator,
       hooks=hooks) as sess:

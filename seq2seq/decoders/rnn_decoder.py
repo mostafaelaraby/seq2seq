@@ -62,6 +62,8 @@ class RNNDecoder(Decoder, GraphModule, Configurable):
     GraphModule.__init__(self, name)
     Configurable.__init__(self, params, mode)
     self.params["rnn_cell"] = _toggle_dropout(self.params["rnn_cell"], mode)
+    if 'num_residual_layers' in self.params["rnn_cell"]:
+        self.params["rnn_cell"]["add_residual"] = True
     self.cell = training_utils.get_rnn_cell(**self.params["rnn_cell"])
     # Not initialized yet
     self.initial_state = None

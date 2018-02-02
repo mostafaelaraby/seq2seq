@@ -110,6 +110,7 @@ class ModelBase(Configurable):
         learning_rate_decay_fn=learning_rate_decay_fn,
         clip_gradients=self._clip_gradients,
         optimizer=optimizer,
+        colocate_gradients_with_ops=True,
         summaries=["learning_rate", "loss", "gradients", "gradient_norm"])
 
     return train_op
